@@ -13,7 +13,7 @@ if [ -n "$ZERO_AUTH" ]; then
     chmod +x /app/server
     nohup /app/server tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token "$ZERO_AUTH" >/dev/null 2>&1 &
 else
-    echo "No ZERO_AUTH token set. Bypassing Cloudflare Tunnel (direct HTTPS/TCP mode)."
+    echo "No ZERO_AUTH token set. Bypassing Cloudflare Tunnel (direct Railway HTTP/WS mode)."
 fi
 
 # Start Xray-core in the background

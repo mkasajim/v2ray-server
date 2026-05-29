@@ -107,7 +107,7 @@
                 </div>
                 <div class="bg-white/5 border border-white/5 p-4 rounded-2xl flex flex-col justify-center">
                     <span class="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">Port</span>
-                    <span class="font-mono text-sm font-medium text-gray-200">443 (HTTPS)</span>
+                    <span id="displayPort" class="font-mono text-sm font-medium text-gray-200">Loading...</span>
                 </div>
                 <div class="bg-white/5 border border-white/5 p-4 rounded-2xl flex flex-col justify-center">
                     <span class="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">Protocol / Path</span>
@@ -166,7 +166,7 @@
                             Verify TLS settings
                         </h4>
                         <p class="leading-relaxed">
-                            Ensure <strong>TLS</strong> is enabled in the client config, with <strong>SNI</strong> and <strong>Host</strong> pointing to your deployment domain. Encryption must be set to <code>none</code>.
+                            Use the generated settings exactly as shown. For Railway HTTPS domains, TLS uses the public domain as SNI while Caddy receives plain HTTP inside the container.
                         </p>
                     </div>
                 </div>
@@ -184,6 +184,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const displayHost = document.getElementById('displayHost');
+            const displayPort = document.getElementById('displayPort');
             const displayPath = document.getElementById('displayPath');
             const displayUuid = document.getElementById('displayUuid');
             const configUri = document.getElementById('configUri');
@@ -195,9 +196,18 @@
             let serverConfig = null;
             let currentTab = 'ws'; // ws or grpc
 
-            // Determine host from location
+            // Determine the public endpoint from the browser URL. Railway terminates
+            // HTTPS at the edge and forwards plain HTTP/WebSocket to this container.
             const serverHost = window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname;
+            const isHttps = window.location.protocol === 'https:';
+            const visiblePort = window.location.port || (isHttps ? '443' : '80');
+            const vlessAddress = `${serverHost}:${visiblePort}`;
+            const securityParams = isHttps
+                ? `security=tls&sni=${encodeURIComponent(serverHost)}`
+                : 'security=none';
+
             displayHost.textContent = serverHost;
+            displayPort.textContent = isHttps ? `${visiblePort} (TLS via Railway)` : `${visiblePort} (HTTP)`;
 
             // Fetch dynamic configuration parameters from Caddy
             async function loadConfig() {
@@ -233,10 +243,10 @@
                 
                 if (currentTab === 'ws') {
                     displayPath.textContent = `VLESS ${serverConfig.ws_path}`;
-                    configUri.value = `vless://${uuid}@${serverHost}:443?encryption=none&security=tls&sni=${serverHost}&type=ws&host=${serverHost}&path=${encodeURIComponent(serverConfig.ws_path)}#V2ray-Server-WebSocket`;
+                    configUri.value = `vless://${uuid}@${vlessAddress}?encryption=none&${securityParams}&type=ws&host=${encodeURIComponent(serverHost)}&path=${encodeURIComponent(serverConfig.ws_path)}#V2ray-Server-WebSocket`;
                 } else {
                     displayPath.textContent = `VLESS gRPC (${serverConfig.grpc_service})`;
-                    configUri.value = `vless://${uuid}@${serverHost}:443?encryption=none&security=tls&sni=${serverHost}&type=grpc&serviceName=${encodeURIComponent(serverConfig.grpc_service)}#V2ray-Server-gRPC`;
+                    configUri.value = `vless://${uuid}@${vlessAddress}?encryption=none&${securityParams}&type=grpc&serviceName=${encodeURIComponent(serverConfig.grpc_service)}#V2ray-Server-gRPC`;
                 }
             }
 

@@ -1,33 +1,37 @@
 {
-    auto_https off
+	auto_https off
 }
 
 http://:{$PORT:8080} {
-    # Enable compression for static assets
-    encode gzip zstd
+	# Enable compression for static assets
+	encode gzip zstd
 
-    # WebSocket Proxy for Xray
-    reverse_proxy /ws localhost:10086 {
-        flush_interval -1
-    }
+	# WebSocket Proxy for Xray
+	reverse_proxy /ws* localhost:10086 {
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		flush_interval -1
+	}
 
-    # gRPC Proxy for Xray (using cleartext HTTP/2)
-    reverse_proxy /grpc/* localhost:10087 {
-        transport http {
-            versions h2c 2
-        }
-        flush_interval -1
-    }
+	# gRPC Proxy for Xray (using cleartext HTTP/2)
+	reverse_proxy /grpc* localhost:10087 {
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			versions h2c 2
+		}
+		flush_interval -1
+	}
 
-    # Configuration Endpoint for the Dashboard
-    handle /config {
-        header Content-Type "application/json"
-        respond `{"uuid": "{$UUID:d342d11e-d424-4583-b36e-524ab1f0afa4}", "ws_path": "/ws", "grpc_service": "grpc"}` 200
-    }
+	# Configuration Endpoint for the Dashboard
+	handle /config {
+		header Content-Type "application/json"
+		respond `{"uuid": "{$UUID:d342d11e-d424-4583-b36e-524ab1f0afa4}", "ws_path": "/ws", "grpc_service": "grpc"}` 200
+	}
 
-    # Serve the premium dashboard static files
-    handle {
-        root * /app/public
-        file_server
-    }
+	# Serve the premium dashboard static files
+	handle {
+		root * /app/public
+		file_server
+	}
 }
