@@ -1,8 +1,15 @@
 {
 	auto_https off
+	debug
 }
 
 http://:{$PORT:8080} {
+	log {
+		output stdout
+		format console
+		level DEBUG
+	}
+
 	# Enable compression for static assets
 	encode gzip zstd
 
