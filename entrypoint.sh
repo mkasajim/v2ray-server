@@ -3,16 +3,9 @@ set -u
 
 APP_PORT="${PORT:-8080}"
 
-echo "===== Runtime diagnostics ====="
-echo "Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-echo "PORT=${APP_PORT}"
-echo "RAILWAY_PUBLIC_DOMAIN=${RAILWAY_PUBLIC_DOMAIN:-<unset>}"
-echo "RAILWAY_STATIC_URL=${RAILWAY_STATIC_URL:-<unset>}"
-echo "ZERO_AUTH set: $(if [ -n "${ZERO_AUTH:-}" ]; then echo yes; else echo no; fi)"
-echo "Caddy version: $(caddy version 2>&1 || true)"
-echo "Xray version:"
-/app/xray/xray version 2>&1 || true
-echo "==============================="
+log_diag() {
+    echo "[diag] $*"
+}
 
 # Set fallback UUID if not defined
 USER_UUID="${UUID:-d342d11e-d424-4583-b36e-524ab1f0afa4}"
@@ -30,43 +23,40 @@ else
     echo "No ZERO_AUTH token set. Bypassing Cloudflare Tunnel (direct Railway HTTP/WS mode)."
 fi
 
-# Start Xray-core in the background
-echo "Effective Xray config:"
-sed "s/${USER_UUID}/<uuid-redacted>/g" /app/config.json
-
-echo "Effective Caddyfile:"
-cat /app/Caddyfile
-
 echo "Starting Xray-core..."
 /app/xray/xray -config /app/config.json &
 XRAY_PID="$!"
 echo "Xray PID: ${XRAY_PID}"
 
-sleep 2
-if kill -0 "${XRAY_PID}" 2>/dev/null; then
-    echo "Xray is still running after startup delay."
-else
-    echo "ERROR: Xray exited during startup."
-fi
-
-echo "Process snapshot before Caddy:"
-ps w 2>&1 || ps 2>&1 || true
-
-echo "Listening sockets before Caddy:"
-netstat -tulpn 2>&1 || ss -tulpn 2>&1 || true
-
 startup_probe() {
-    sleep 4
-    echo "===== Post-start diagnostics ====="
-    echo "Process snapshot:"
+    sleep 3
+    log_diag "===== runtime diagnostics ====="
+    log_diag "date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    log_diag "PORT=${APP_PORT}"
+    log_diag "RAILWAY_PUBLIC_DOMAIN=${RAILWAY_PUBLIC_DOMAIN:-<unset>}"
+    log_diag "RAILWAY_STATIC_URL=${RAILWAY_STATIC_URL:-<unset>}"
+    log_diag "ZERO_AUTH set=$(if [ -n "${ZERO_AUTH:-}" ]; then echo yes; else echo no; fi)"
+    log_diag "Caddy version: $(caddy version 2>&1 || true)"
+    log_diag "Xray version:"
+    /app/xray/xray version 2>&1 | sed 's/^/[diag] /' || true
+    if kill -0 "${XRAY_PID}" 2>/dev/null; then
+        log_diag "Xray is running."
+    else
+        log_diag "ERROR: Xray exited."
+    fi
+    log_diag "effective Xray config follows; UUID redacted"
+    sed "s/${USER_UUID}/<uuid-redacted>/g" /app/config.json | sed 's/^/[xray-config] /'
+    log_diag "effective Caddyfile follows"
+    sed 's/^/[caddyfile] /' /app/Caddyfile
+    log_diag "process snapshot"
     ps w 2>&1 || ps 2>&1 || true
-    echo "Listening sockets:"
+    log_diag "listening sockets"
     netstat -tulpn 2>&1 || ss -tulpn 2>&1 || true
-    echo "Local Caddy /config probe:"
+    log_diag "local Caddy /config probe"
     wget -S -O - "http://127.0.0.1:${APP_PORT}/config" 2>&1 || true
-    echo "Local Caddy /ws probe without WebSocket headers; HTTP 400/502 output here is useful:"
+    log_diag "local Caddy /ws probe without WebSocket headers; HTTP 400/502 output here is useful"
     wget -S -O - "http://127.0.0.1:${APP_PORT}/ws" 2>&1 || true
-    echo "===== End post-start diagnostics ====="
+    log_diag "===== end runtime diagnostics ====="
 }
 
 startup_probe &
