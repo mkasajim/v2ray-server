@@ -10,7 +10,10 @@ RUN curl -L -o xray.zip "https://github.com/XTLS/Xray-core/releases/latest/downl
     unzip xray.zip -d /app/xray
 
 # Download latest Caddy
-RUN curl -L -o caddy.tar.gz "https://github.com/caddyserver/caddy/releases/latest/download/caddy_linux_amd64.tar.gz" && \
+RUN caddy_url=$(curl -sIL -o /dev/null -w "%{url_effective}" "https://github.com/caddyserver/caddy/releases/latest") && \
+    tag="${caddy_url##*/}" && \
+    version="${tag#v}" && \
+    curl -L -o caddy.tar.gz "https://github.com/caddyserver/caddy/releases/download/${tag}/caddy_${version}_linux_amd64.tar.gz" && \
     tar -xzf caddy.tar.gz caddy
 
 # --- Stage 2: Final Run Image ---
