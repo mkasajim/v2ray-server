@@ -1,0 +1,26 @@
+:{$PORT:8080} {
+    # Enable compression for static assets
+    encode gzip zstd
+
+    # WebSocket Proxy for Xray
+    reverse_proxy /ws localhost:10086
+
+    # gRPC Proxy for Xray (using cleartext HTTP/2)
+    reverse_proxy /grpc/* localhost:10087 {
+        transport http {
+            versions h2c 2
+        }
+    }
+
+    # Configuration Endpoint for the Dashboard
+    handle /config {
+        header Content-Type "application/json"
+        respond `{"uuid": "{$UUID:d342d11e-d424-4583-b36e-524ab1f0afa4}", "ws_path": "/ws", "grpc_service": "grpc"}` 200
+    }
+
+    # Serve the premium dashboard static files
+    handle {
+        root * /app/public
+        file_server
+    }
+}
