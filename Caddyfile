@@ -1,15 +1,22 @@
-:{$PORT:8080} {
+{
+    auto_https off
+}
+
+http://:{$PORT:8080} {
     # Enable compression for static assets
     encode gzip zstd
 
     # WebSocket Proxy for Xray
-    reverse_proxy /ws localhost:10086
+    reverse_proxy /ws localhost:10086 {
+        flush_interval -1
+    }
 
     # gRPC Proxy for Xray (using cleartext HTTP/2)
     reverse_proxy /grpc/* localhost:10087 {
         transport http {
             versions h2c 2
         }
+        flush_interval -1
     }
 
     # Configuration Endpoint for the Dashboard
