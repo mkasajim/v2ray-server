@@ -7,6 +7,14 @@ log_diag() {
     echo "[diag] $*"
 }
 
+print_prefixed_file() {
+    prefix="$1"
+    file="$2"
+    while IFS= read -r line; do
+        echo "${prefix} ${line}"
+    done < "$file"
+}
+
 # Set fallback UUID if not defined
 USER_UUID="${UUID:-d342d11e-d424-4583-b36e-524ab1f0afa4}"
 echo "Configuring Xray-core with UUID: ${USER_UUID}"
@@ -45,15 +53,19 @@ startup_probe() {
         log_diag "ERROR: Xray exited."
     fi
     log_diag "effective Xray config follows; UUID redacted"
-    sed "s/${USER_UUID}/<uuid-redacted>/g" /app/config.json | sed 's/^/[xray-config] /'
+    redacted_config="/tmp/xray-config-redacted.json"
+    sed "s/${USER_UUID}/<uuid-redacted>/g" /app/config.json > "${redacted_config}"
+    print_prefixed_file "[xray-config]" "${redacted_config}"
     log_diag "effective Caddyfile follows"
-    sed 's/^/[caddyfile] /' /app/Caddyfile
+    print_prefixed_file "[caddyfile]" /app/Caddyfile
     log_diag "process snapshot"
     ps w 2>&1 || ps 2>&1 || true
     log_diag "listening sockets"
     netstat -tulpn 2>&1 || ss -tulpn 2>&1 || true
     log_diag "local Caddy /config probe"
     wget -S -O - "http://127.0.0.1:${APP_PORT}/config" 2>&1 || true
+    log_diag "local Caddy /health probe"
+    wget -S -O - "http://127.0.0.1:${APP_PORT}/health" 2>&1 || true
     log_diag "local Caddy /ws probe without WebSocket headers; HTTP 400/502 output here is useful"
     wget -S -O - "http://127.0.0.1:${APP_PORT}/ws" 2>&1 || true
     log_diag "===== end runtime diagnostics ====="
